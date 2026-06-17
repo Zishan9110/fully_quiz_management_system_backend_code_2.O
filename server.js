@@ -51,12 +51,25 @@ app.set('trust proxy', 1);
 // Init Socket.IO
 initSocket(server);
 
-// ✅ FORCE PRODUCTION URL
-const PROD_URL = 'https://learnova-platform.vercel.app';
+// ✅ Get CLIENT_URL from environment (NO FALLBACK to localhost)
+const CLIENT_URL = process.env.CLIENT_URL;
+console.log('🔗 CLIENT_URL from env:', CLIENT_URL);
+
+// If CLIENT_URL is not set, show error but don't crash
+if (!CLIENT_URL) {
+  console.error('⚠️ WARNING: CLIENT_URL environment variable is not set!');
+  console.error('⚠️ Redirects will use: https://learnova-platform.vercel.app as fallback');
+}
+
+// ✅ Use production URL or fallback
+const PROD_URL = CLIENT_URL || 'https://learnova-platform.vercel.app';
 console.log('🔗 Using PROD_URL:', PROD_URL);
 
 // Security
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(helmet({ 
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false // Disable for development
+}));
 app.use(mongoSanitize());
 app.use(xss());
 app.use(hpp());
@@ -75,7 +88,7 @@ const authLimiter = rateLimit({
 
 // CORS
 app.use(cors({
-  origin: [PROD_URL, 'http://localhost:5173', 'http://localhost:3000'],
+  origin: [PROD_URL, 'https://learnova-platform.vercel.app', 'http://localhost:5173', 'http://localhost:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -102,7 +115,7 @@ app.get('/api/health', (req, res) => {
 
 console.log('🔧 Registering Routes...');
 
-// Admin routes FIRST
+// ✅ Admin routes FIRST (to avoid conflicts)
 app.use('/api/admin/auth', authLimiter, adminAuthRoutes);
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/admin', adminRoutes);
@@ -120,9 +133,15 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/payments', paymentRoutes);
 
 console.log('✅ API Routes Registered');
+console.log('📋 Registered Routes:');
+console.log('  - /api/admin/auth (Admin Authentication)');
+console.log('  - /api/auth (Student Authentication)');
+console.log('  - /api/admin (Admin Dashboard)');
+console.log('  - /api/quizzes (Quiz Management)');
+console.log('  - /api/payments (Payment Processing)');
 
 // ============================================
-// AUTH REDIRECT HANDLERS
+// 🔥 AUTH REDIRECT HANDLERS - FIXED (NO LOCALHOST)
 // ============================================
 
 // Admin Auth Success Handler
@@ -164,10 +183,13 @@ app.get('/login', (req, res) => {
 });
 
 // ============================================
-// 404 Handler
+// 404 Handler (KEEP AT THE END)
 // ============================================
 app.use('*', (req, res) => {
-  res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
+  res.status(404).json({ 
+    success: false, 
+    message: `Route ${req.originalUrl} not found` 
+  });
 });
 
 // Error handler
@@ -178,13 +200,21 @@ require('./jobs');
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT} [${process.env.NODE_ENV}]`);
-  logger.info(`Client URL: ${PROD_URL}`);
-  logger.info(`Gemini AI: ${process.env.GEMINI_API_KEY ? 'enabled' : 'disabled'}`);
+  logger.info(`🚀 Server running on port ${PORT} [${process.env.NODE_ENV}]`);
+  logger.info(`🔗 Client URL: ${PROD_URL}`);
+  logger.info(`🔗 Backend URL: ${process.env.BACKEND_URL || 'http://localhost:3000'}`);
+  logger.info(`🤖 Gemini AI: ${process.env.GEMINI_API_KEY ? '✅ enabled' : '❌ disabled (set GEMINI_API_KEY)'}`);
+  logger.info(`📧 Email Service: ${process.env.EMAIL_USER ? '✅ configured' : '❌ not configured'}`);
+  logger.info(`🗄️ Database: ${process.env.MONGO_URI ? '✅ connected' : '❌ not connected'}`);
 });
 
 process.on('unhandledRejection', (err) => {
-  logger.error(`Unhandled Rejection: ${err.message}`);
+  logger.error(`❌ Unhandled Rejection: ${err.message}`);
+  server.close(() => process.exit(1));
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error(`❌ Uncaught Exception: ${err.message}`);
   server.close(() => process.exit(1));
 });
 

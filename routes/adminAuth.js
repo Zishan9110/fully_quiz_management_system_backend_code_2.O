@@ -8,6 +8,10 @@ const { sendToken } = require('../utils/sendToken');
 
 console.log('🔧 Admin Auth Routes Initialized');
 
+// ✅ FORCE PRODUCTION URL - Hardcoded
+const PROD_URL = 'https://learnova-platform.vercel.app';
+console.log('🔗 Using PROD_URL:', PROD_URL);
+
 // ============================================
 // ADMIN CONTROLLER FUNCTIONS
 // ============================================
@@ -205,13 +209,14 @@ const rejectAdmin = async (req, res, next) => {
 };
 
 // ============================================
-// GOOGLE AUTH ROUTES - ADMIN
+// GOOGLE AUTH ROUTES - ADMIN (FORCE PRODUCTION)
 // ============================================
 
 router.get('/google',
   (req, res, next) => {
     console.log('🔗🔗🔗 ADMIN Google route hit!');
     console.log('📡 Full URL:', req.originalUrl);
+    console.log('🔗 Will redirect to:', PROD_URL);
     next();
   },
   passport.authenticate('admin-google', {
@@ -229,7 +234,7 @@ router.get('/google/callback',
   },
   passport.authenticate('admin-google', {
     session: false,
-    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:5173'}/admin/login?error=google_auth_failed`
+    failureRedirect: `${PROD_URL}/admin/login?error=google_auth_failed`
   }),
   (req, res) => {
     console.log('✅✅✅ Admin Google Callback Success!');
@@ -247,23 +252,26 @@ router.get('/google/callback',
       );
 
       const adminData = encodeURIComponent(JSON.stringify(adminObj));
-      console.log('🔑 Token generated');
+      console.log('🔑 Token generated for:', adminObj.email);
       
-      return res.redirect(
-        `${process.env.CLIENT_URL || 'http://localhost:5173'}/admin/auth-success?token=${token}&admin=${adminData}`
-      );
+      // ✅ FORCE PRODUCTION URL
+      const redirectUrl = `${PROD_URL}/admin/auth-success?token=${token}&admin=${adminData}`;
+      console.log('🔄 Redirecting to:', redirectUrl);
+      
+      return res.redirect(302, redirectUrl);
     }
 
     if (req.authInfo?.isPending) {
       console.log('⏳ Admin pending approval:', req.authInfo.message);
+      const message = encodeURIComponent(req.authInfo.message);
       return res.redirect(
-        `${process.env.CLIENT_URL || 'http://localhost:5173'}/admin/login?pending=true&message=${encodeURIComponent(req.authInfo.message)}`
+        `${PROD_URL}/admin/login?pending=true&message=${message}`
       );
     }
 
     console.log('❌ Admin Google callback failed');
     return res.redirect(
-      `${process.env.CLIENT_URL || 'http://localhost:5173'}/admin/login?error=google_login_failed`
+      `${PROD_URL}/admin/login?error=google_login_failed`
     );
   }
 );

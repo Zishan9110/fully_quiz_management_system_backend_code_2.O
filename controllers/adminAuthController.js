@@ -387,6 +387,10 @@ exports.rejectAdmin = asyncHandler(async (req, res, next) => {
 // -----------------------------
 const notifySuperAdmins = async (newAdmin) => {
   try {
+    console.log('🔍 Starting notifySuperAdmins...');
+    console.log('📧 New Admin Email:', newAdmin.email);
+    console.log('📧 New Admin Name:', newAdmin.firstName, newAdmin.lastName);
+    
     // Get all super admins
     const superAdmins = await Admin.find({ 
       role: 'super_admin',
@@ -394,19 +398,27 @@ const notifySuperAdmins = async (newAdmin) => {
       isApproved: true
     });
 
+    console.log(`📊 Found ${superAdmins.length} super admins:`);
+    superAdmins.forEach(a => console.log(`  - ${a.email}`));
+
     if (superAdmins.length === 0) {
       console.log('⚠️ No super admins found to notify');
       return;
     }
 
-    console.log(`📧 Notifying ${superAdmins.length} super admins about new admin: ${newAdmin.email}`);
-
-    const approvalLink = `${process.env.CLIENT_URL || 'http://localhost:5173'}/admin/pending-approvals`;
+    // ✅ Use production URL
+    const CLIENT_URL = process.env.CLIENT_URL || 'https://learnova-platform.vercel.app';
+    const approvalLink = `${CLIENT_URL}/admin/pending-approvals`;
+    
+    console.log(`🔗 Approval Link: ${approvalLink}`);
 
     // Send notification to each super admin
     for (const superAdmin of superAdmins) {
       try {
-        await sendEmail({
+        console.log(`📧 Sending email to: ${superAdmin.email}`);
+        console.log(`📧 From: ${process.env.EMAIL_USER}`);
+        
+        const emailResult = await sendEmail({
           to: superAdmin.email,
           subject: '🔔 New Admin Registration Pending Approval',
           html: `
@@ -428,13 +440,18 @@ const notifySuperAdmins = async (newAdmin) => {
             </div>
           `
         });
-        console.log(`✅ Email sent to super admin: ${superAdmin.email}`);
+        
+        console.log(`✅ Email sent successfully to: ${superAdmin.email}`);
+        console.log(`📧 Message ID: ${emailResult.messageId}`);
+        
       } catch (err) {
-        console.log(`❌ Failed to notify ${superAdmin.email}:`, err.message);
+        console.error(`❌ Failed to send to ${superAdmin.email}:`, err.message);
+        console.error('❌ Full error:', err);
       }
     }
   } catch (err) {
-    console.log('❌ Failed to fetch super admins:', err.message);
+    console.error('❌ Failed to fetch super admins:', err.message);
+    console.error('❌ Full error:', err);
   }
 };
 

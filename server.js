@@ -1,4 +1,3 @@
-// server.js - Add payment routes import at the top with other routes
 const express = require('express');
 const dotenv = require('dotenv');
 const http = require('http');
@@ -14,9 +13,9 @@ const rateLimit = require('express-rate-limit');
 
 dotenv.config();
 
-// 🔥 ADD PASSPORT
+// 🔥 PASSPORT
 const passport = require('passport');
-require('./config/passport'); // Initialize passport strategies
+require('./config/passport');
 
 const connectDB = require('./config/db');
 const logger = require('./utils/logger');
@@ -24,22 +23,20 @@ const errorHandler = require('./middleware/errorHandler');
 const { initSocket } = require('./sockets');
 
 // Route imports
-const authRoutes         = require('./routes/auth');
-const adminAuthRoutes    = require('./routes/adminAuth');
-const adminRoutes        = require('./routes/admin');
-const quizRoutes         = require('./routes/quizzes');
-const courseRoutes       = require('./routes/courses');
-const questionRoutes     = require('./routes/questions');
-const resultRoutes       = require('./routes/results');
-const leaderboardRoutes  = require('./routes/leaderboard');
+const authRoutes = require('./routes/auth');
+const adminAuthRoutes = require('./routes/adminAuth');
+const adminRoutes = require('./routes/admin');
+const quizRoutes = require('./routes/quizzes');
+const courseRoutes = require('./routes/courses');
+const questionRoutes = require('./routes/questions');
+const resultRoutes = require('./routes/results');
+const leaderboardRoutes = require('./routes/leaderboard');
 const announcementRoutes = require('./routes/announcements');
-const messageRoutes      = require('./routes/messages');
+const messageRoutes = require('./routes/messages');
 const notificationRoutes = require('./routes/notifications');
-const settingsRoutes     = require('./routes/settings');
-const aiRoutes           = require('./routes/ai');
-const uploadRoutes       = require('./routes/uploads');
-
-// 🔥 ADD THIS - Payment routes import
+const settingsRoutes = require('./routes/settings');
+const aiRoutes = require('./routes/ai');
+const uploadRoutes = require('./routes/uploads');
 const paymentRoutes = require('./routes/paymentRoutes');
 
 // Connect DB
@@ -58,11 +55,6 @@ app.use(xss());
 app.use(hpp());
 
 // Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
-  message: { success: false, message: 'Too many requests, please try again later.' }
-});
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,
@@ -71,7 +63,7 @@ const authLimiter = rateLimit({
 
 // CORS
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -88,7 +80,7 @@ app.use(passport.initialize());
 // Logging
 if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
 
-// Static uploads (local fallback)
+// Static uploads
 app.use('/uploads', express.static('uploads'));
 
 // Health check
@@ -96,26 +88,68 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'QuizMaster API is running', timestamp: new Date(), version: '1.0.0' });
 });
 
-// Routes
-app.use('/api/auth',           authLimiter, authRoutes);
-app.use('/api/admin/auth',     authLimiter, adminAuthRoutes);
-app.use('/api/admin',          adminRoutes);
-app.use('/api/quizzes',        quizRoutes);
-app.use('/api/courses',        courseRoutes);
-app.use('/api/questions',      questionRoutes);
-app.use('/api/results',        resultRoutes);
-app.use('/api/leaderboard',    leaderboardRoutes);
-app.use('/api/announcements',  announcementRoutes);
-app.use('/api/messages',       messageRoutes);
-app.use('/api/notifications',  notificationRoutes);
-app.use('/api/settings',       settingsRoutes);
-app.use('/api/ai',             aiRoutes);
-app.use('/api/upload',         uploadRoutes);
+console.log('🔧 Registering Routes...');
 
-// 🔥 ADD THIS - Payment routes (MUST be after body parsers)
-app.use('/api/payments',       paymentRoutes);
+// ✅ Admin routes FIRST
+app.use('/api/admin/auth', authLimiter, adminAuthRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/quizzes', quizRoutes);
+app.use('/api/courses', courseRoutes);
+app.use('/api/questions', questionRoutes);
+app.use('/api/results', resultRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/announcements', announcementRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/payments', paymentRoutes);
 
-// 404
+console.log('✅ API Routes Registered');
+
+// ============================================
+// 🔥 AUTH REDIRECT HANDLERS (For Google OAuth)
+// ============================================
+
+// Admin Auth Success - Redirect to frontend
+app.get('/admin/auth-success', (req, res) => {
+  console.log('✅ Admin auth success callback');
+  const queryString = req.url.includes('?') ? req.url.split('?')[1] : '';
+  const redirectUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/admin/auth-success${queryString ? '?' + queryString : ''}`;
+  console.log('🔄 Redirecting to:', redirectUrl);
+  res.redirect(redirectUrl);
+});
+
+// Admin Login - Redirect to frontend (for errors)
+app.get('/admin/login', (req, res) => {
+  console.log('🔄 Admin login redirect with error:', req.query);
+  const queryString = req.url.includes('?') ? req.url.split('?')[1] : '';
+  const redirectUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/admin/login${queryString ? '?' + queryString : ''}`;
+  console.log('🔄 Redirecting to:', redirectUrl);
+  res.redirect(redirectUrl);
+});
+
+// Student Auth Success
+app.get('/auth-success', (req, res) => {
+  console.log('✅ Student auth success callback');
+  const queryString = req.url.includes('?') ? req.url.split('?')[1] : '';
+  const redirectUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/auth-success${queryString ? '?' + queryString : ''}`;
+  res.redirect(redirectUrl);
+});
+
+// Student Login (for errors)
+app.get('/login', (req, res) => {
+  console.log('🔄 Student login redirect with error:', req.query);
+  const queryString = req.url.includes('?') ? req.url.split('?')[1] : '';
+  const redirectUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/login${queryString ? '?' + queryString : ''}`;
+  res.redirect(redirectUrl);
+});
+
+// ============================================
+// 404 Handler (KEEP AT THE END)
+// ============================================
 app.use('*', (req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
 });
@@ -129,7 +163,8 @@ require('./jobs');
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   logger.info(`Server running on port ${PORT} [${process.env.NODE_ENV}]`);
-  logger.info(`Gemini AI: ${process.env.GEMINI_API_KEY ? 'enabled' : 'disabled (set GEMINI_API_KEY)'}`);
+  logger.info(`Client URL: ${process.env.CLIENT_URL}`);
+  logger.info(`Gemini AI: ${process.env.GEMINI_API_KEY ? 'enabled' : 'disabled'}`);
 });
 
 process.on('unhandledRejection', (err) => {

@@ -14,6 +14,10 @@ const rateLimit = require('express-rate-limit');
 
 dotenv.config();
 
+// 🔥 ADD PASSPORT
+const passport = require('passport');
+require('./config/passport'); // Initialize passport strategies
+
 const connectDB = require('./config/db');
 const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
@@ -78,6 +82,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(compression());
+
+app.use(passport.initialize());
 
 // Logging
 if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
